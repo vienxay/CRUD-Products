@@ -3,6 +3,7 @@ import {
   createContext,
   useContext,
   useState,
+  useEffect,
   useCallback,
   type ReactNode,
 } from "react";
@@ -27,25 +28,29 @@ function isValidUser(data: unknown): data is UserResponse {
   );
 }
 
-function getStoredUser(): UserResponse | null {
-  if (typeof window === "undefined") return null;
-  const stored = localStorage.getItem("user");
-  if (!stored) return null;
-  try {
-    const parsed: unknown = JSON.parse(stored);
-    if (isValidUser(parsed)) return parsed;
-    localStorage.removeItem("user");
-    localStorage.removeItem("token");
-  } catch {
-    localStorage.removeItem("user");
-    localStorage.removeItem("token");
-  }
-  return null;
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<UserResponse | null>(getStoredUser);
-  const [loading] = useState(false);
+  const [user, setUser] = useState<UserResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("user");
+    if (stored) {
+      try {
+        const parsed: unknown = JSON.parse(stored);
+        if (isValidUser(parsed)) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from localStorage on mount
+          setUser(parsed);
+        } else {
+          localStorage.removeItem("user");
+          localStorage.removeItem("token");
+        }
+      } catch {
+        localStorage.removeItem("user");
+        localStorage.removeItem("token");
+      }
+    }
+    setLoading(false);
+  }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     const res = await authApi.login(email, password);
